@@ -813,6 +813,7 @@ struct f2fs_nm_info {
 	spinlock_t nid_list_lock;	/* protect nid lists ops */
 	struct mutex build_lock;	/* lock for build free nids */
 	unsigned char **free_nid_bitmap;
+	unsigned char *free_nid_bitmap_buf;	/* backs free_nid_bitmap[] */
 	unsigned char *nat_block_bitmap;
 	unsigned short *free_nid_count;	/* free nid count of NAT block */
 

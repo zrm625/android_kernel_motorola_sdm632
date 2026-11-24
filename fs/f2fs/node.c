@@ -3019,6 +3019,7 @@ static int init_node_manager(struct f2fs_sb_info *sbi)
 static int init_free_nid_cache(struct f2fs_sb_info *sbi)
 {
 	struct f2fs_nm_info *nm_i = NM_I(sbi);
+	unsigned int bitmap_size = f2fs_bitmap_size(NAT_ENTRY_PER_BLOCK);
 	int i;
 
 	nm_i->free_nid_bitmap =
@@ -3028,12 +3029,15 @@ static int init_free_nid_cache(struct f2fs_sb_info *sbi)
 	if (!nm_i->free_nid_bitmap)
 		return -ENOMEM;
 
-	for (i = 0; i < nm_i->nat_blocks; i++) {
-		nm_i->free_nid_bitmap[i] = f2fs_kvzalloc(sbi,
-			f2fs_bitmap_size(NAT_ENTRY_PER_BLOCK), GFP_KERNEL);
-		if (!nm_i->free_nid_bitmap[i])
-			return -ENOMEM;
-	}
+	/* One block for all NAT blocks' bitmaps, like build_sit_info(). */
+	nm_i->free_nid_bitmap_buf = f2fs_kvzalloc(sbi,
+			array_size(bitmap_size, nm_i->nat_blocks), GFP_KERNEL);
+	if (!nm_i->free_nid_bitmap_buf)
+		return -ENOMEM;
+
+	for (i = 0; i < nm_i->nat_blocks; i++)
+		nm_i->free_nid_bitmap[i] =
+			nm_i->free_nid_bitmap_buf + i * bitmap_size;
 
 	nm_i->nat_block_bitmap = f2fs_kvzalloc(sbi, nm_i->nat_blocks / 8,
 								GFP_KERNEL);
@@ -3131,13 +3135,8 @@ void f2fs_destroy_node_manager(struct f2fs_sb_info *sbi)
 	up_write(&nm_i->nat_tree_lock);
 
 	kvfree(nm_i->nat_block_bitmap);
-	if (nm_i->free_nid_bitmap) {
-		int i;
-
-		for (i = 0; i < nm_i->nat_blocks; i++)
-			kvfree(nm_i->free_nid_bitmap[i]);
-		kvfree(nm_i->free_nid_bitmap);
-	}
+	kvfree(nm_i->free_nid_bitmap_buf);
+	kvfree(nm_i->free_nid_bitmap);
 	kvfree(nm_i->free_nid_count);
 
 	kvfree(nm_i->nat_bitmap);
